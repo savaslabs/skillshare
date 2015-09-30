@@ -1,0 +1,254 @@
+#+TITLE: Drupal VM
+#+AUTHOR: Kosta Harlan
+#+EMAIL: kosta@savaslabs.com
+#+OPTIONS: num:nil
+#+REVEAL_THEME: night
+
+* What is it?
+
+Drupal VM is a project created & maintained by Jeff Geerling (geerlingguy).
+
+#+begin_quote
+This project aims to make spinning up a simple local Drupal test/development environment incredibly quick and easy, and to introduce new developers to the wonderful world of Drupal development on local virtual machines.[fn:1]
+#+end_quote
+
+Let's come back to this definition.
+
+* Some terminology
+
+You don't need to know any of this to get started with Drupal VM, but let's talk about it anyway, 'cause it's interesting.
+
+** Virtual Machines
+
+#+begin_quote
+A virtual machine (VM) is a software implementation of a machine (for example, a computer) that executes programs like a physical machine. Virtual machines are separated into two major classes, based on their use and degree of correspondence to any real machine.
+
+- system virtual machine :: provides a complete system platform which supports the execution of a complete operating system (OS)
+- process virtual machine (also, language virtual machine) :: designed to run a single program, which means that it supports a single process [fn:2]
+#+end_quote
+
+** VirtualBox
+
+#+begin_quote
+Oracle VM VirtualBox is a hypervisor for x86 computers from Oracle Corporation. [fn:4]
+#+end_quote
+
+#+begin_quote
+A hypervisor or virtual machine monitor (VMM) is a piece of computer software, firmware or hardware that creates and runs virtual machines. [fn:3]
+#+end_quote
+
+*** Behold the hypervisor
+
+https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Hyperviseur.png/400px-Hyperviseur.png
+
+** Vagrant
+
+#+begin_quote
+Vagrant is computer software that creates and configures virtual development environments. It can be seen as a higher-level wrapper around virtualization software such as VirtualBox, VMware, KVM and Linux Containers (LXC), and around configuration management software such as Ansible, Chef, Salt, and Puppet. [fn:5]
+#+end_quote
+
+** Ansible
+
+#+begin_quote
+Ansible is a free software platform for configuring and managing computers. It combines multi-node software deployment, ad hoc task execution, and configuration management. It manages nodes over SSH or PowerShell and requires Python (2.4 or later) to be installed on them. Modules work over JSON and standard output and can be written in any programming language. The system uses YAML to express reusable descriptions of systems. [fn:6]
+#+end_quote
+
+* So what is Drupal VM?
+
+Built on aforementioned tools to create a nice development environment for Drupal 6/7/8.
+
+** Why might you use it?
+
+- Standardization :: Reduce "works on my machine" syndrome.
+- Prepackaged tools :: Such as:
+  - Drush & Drupal Console
+  - Varnish & Memcached, Solr
+  - Selenium, Behat
+  - XHProf & XDebug
+  - Adminer (like PhpMyAdmin)
+  - Unfortunately named log viewer
+  - MailHog
+  - And more. All of these tools take considerable time and effort to install and configure on your laptop; Drupal VM handles all of this for you.
+- Adding new sites is super easy :: Adjust a few lines of (versionable) code and you're off.
+
+* Getting started
+
+Before you do anything, open up your favorite note taking app and take detailed notes of what commands you run, what output you get, etc. It will help down the road if you need to debug.
+
+** Install dependencies
+
+Form the project homepage, there's a link to the Quickstart Guide: https://github.com/geerlingguy/drupal-vm#quick-start-guide
+
+Only do step 1 for now, and from the quick start guide, also install Ansible as recommended.
+
+** Getting the code
+
+Project homepage says to "Download Drupal VM", but let's not do that, since that's
+
+- the latest code from =master= which might be unstable
+- not in version control, so updating later will be more tedious
+
+Instead, do something like this:
+
+#+begin_src sh
+git clone git@github.com:geerlingguy/drupal-vm.git ~/src/drupal-vm
+# or wherever you'd like to keep these files
+#+end_src
+
+*** Set up the configuration files
+
+The quickstart docs say to copy the example configuration files. Let's do something a bit different.
+
+#+begin_src sh
+  # Wherever you want to store your config files
+  mkdir ~/src/drupal_vm_config
+  # Copy the example files to your new directory
+  cp ~/src/drupal-vm/example.drupal.make.yml \
+     ~/src/drupal_vm_config/drupal.make.yml
+  cp ~/src/drupal-vm/example.config.yml \
+     ~/src/drupal_vm_config/config.yml
+  # Symlink them back to Drupal VM
+  ln -s ~/src/drupal_vm_config/config.yml \
+     ~/src/drupal-vm/config.yml
+  ln -s ~/src/drupal_vm_config/drupal.make.yml \
+     ~/src/drupal-vm/drupal.make.yml
+  # Save your work!
+  cd ~/src/drupal_vm_config
+  git init
+  git add .
+  git commit -m 'Why is there something rather than nothing?'
+  # Optionally, push to a (private) remote somewhere
+#+end_src
+
+*** Install some vagrant plugins
+
+Inside your =drupal-vm= directory, run:
+
+#+begin_src sh
+# Manages your /etc/hosts so you don't have to!
+vagrant plugin install vagrant-hostsupdater
+#+end_src
+
+*** Adjust your config
+
+**** Synced folders
+
+#+begin_src yaml
+vagrant_synced_folders:
+  # The first synced folder will be used for the default Drupal installation, if
+  # build_makefile: is 'true'.
+  - local_path: ~/Sites/drupalvm
+    destination: /var/www
+    type: nfs
+    create: true
+#+end_src
+
+#+REVEAL: split
+**** Memory/CPU
+
+#+begin_src yaml
+vagrant_memory: 1024
+vagrant_cpus: 2
+#+end_src
+
+#+REVEAL: split
+**** No makefile
+
+#+begin_src yaml
+# Set this to false if you are using a different site deployment strategy and
+# would like to configure 'vagrant_synced_folders' and 'apache_vhosts' manually.
+build_makefile: true # change to false
+drush_makefile_path: /vagrant/drupal.make.yml
+#+end_src
+
+#+REVEAL: split
+**** Don't install a site
+
+#+begin_src yaml
+# Set this to false if you don't need to install drupal (using the drupal_*
+# settings below), but instead copy down a database (e.g. using drush sql-sync).
+install_site: true # change to false
+#+end_src
+
+#+REVEAL: split
+**** Example configuration for MIT Press
+
+#+begin_src yaml
+vagrant_synced_folders:
+  - local_path: ~/src/mitpress
+    destination: /var/www/mitpress
+    type: rsync
+    id: mitpress
+
+apache_vhosts:
+  - servername: "local.mitpress.mit.edu"
+    documentroot: "/var/www/mitpress/htdocs"
+
+apache_vhosts_ssl:
+  - {
+    servername: "local.mitpress.mit.edu",
+    documentroot: "/var/www/mitpress/htdocs",
+    certificate_file: "/etc/ssl/certs/ssl-cert-snakeoil.pem",
+    certificate_key_file: "/etc/ssl/private/ssl-cert-snakeoil.key",
+    }
+
+mysql_databases:
+  - name: "mitpress_vagrant"
+    encoding: utf8
+    collation: utf8_general_ci
+#+end_src
+
+#+REVEAL: split
+That's it! (Or is it?)
+
+** Building Drupal VM
+
+- =vagrant up= :: build the VM
+- =vagrant reload= :: Reload the configuration file (=config.yml=)
+- =vagrant provision= :: "do stuff" in the VM based on the reloaded configuration file
+- =vagrant reload --provision= :: you guessed it!
+
+* Gotchas/tips etc
+
+** Directory syncing
+
+NFS can be a pain to set up. YMMV. Rsync is the fastest, but has some limitations (one-way).
+
+*** Use vagrant rsync-auto
+
+This helps ease the pain a bit: =vagrant rsync-auto=
+
+** It's a remote environment
+
+Some stuff doesn't just work. Most of the time you can use =drush @drupalvm.{yoursite}= to get around the inconvenience but that's not always the case (e.g. =robo=).
+
+*** SSH tunnel
+
+If you have a SQL gui, like SequelPro and the like (or PhpStorm for that matter), you can connect to the VM's SQL daemon using an SSH tunnel. If you want to use the command line, you create the tunnel like so:
+
+#+begin_src sh
+ssh -L 3307:localhost:3306 vagrant@drupalvm.dev -i ~/.vagrant.d/insecure_private_key
+#+end_src
+
+** Stuff will probably break (hasn't yet though)
+
+Vagrant boxes used to be difficult to maintain, and running =vagrant up= left you crossing your fingers that all the dependencies would get pulled in. So far this project is holding up.
+
+** Need help?
+
+- Drupal VM docs :: http://docs.drupalvm.com/en/latest/
+- Drupal VM issue queue :: https://github.com/geerlingguy/drupal-vm/issues
+
+* Footnotes
+
+[fn:6] https://en.wikipedia.org/wiki/Ansible_%28software%29
+
+[fn:5] https://en.wikipedia.org/wiki/Vagrant_%28software%29
+
+[fn:4] https://en.wikipedia.org/wiki/VirtualBox
+
+[fn:3] https://en.wikipedia.org/wiki/Hypervisor
+
+[fn:2] https://en.wikipedia.org/wiki/Virtual_machine
+
+[fn:1] http://www.drupalvm.com/
