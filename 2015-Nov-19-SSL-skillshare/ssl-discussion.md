@@ -14,3 +14,4 @@
 
 ## Comments
 + https://en.wikipedia.org/wiki/Firesheep 
++ Follow up associated fix to serve jqueryui over SSL: https://github.com/chrisarusso/Tilthy-Rich-Compost-Website/commit/13d5770347c5cb3799b2a355f5342f1a3ea731c8
